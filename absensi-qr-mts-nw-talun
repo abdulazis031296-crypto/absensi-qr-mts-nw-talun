@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_self">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#176B43">
+  <title>Absensi Digital MTs NW Talun</title>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <style>
+    :root{--green:#176B43;--green2:#218653;--yellow:#F2C94C;--bg:#f3f6f4;--ink:#1e2b24;--muted:#68766e;--line:#dce5df;--red:#b42318}
+    *{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:var(--bg);color:var(--ink)}
+    button,input,select,textarea{font:inherit}button{cursor:pointer;border:0;border-radius:10px;padding:11px 14px;background:var(--green);color:#fff;font-weight:700}
+    button.secondary{background:#e8f1eb;color:var(--green)}button.yellow{background:var(--yellow);color:#382b00}button.danger{background:#b42318}
+    input,select,textarea{width:100%;padding:11px;border:1px solid var(--line);border-radius:9px;background:#fff}
+    label{display:block;font-size:13px;font-weight:700;margin:10px 0 5px}.muted{color:var(--muted);font-size:13px}
+    .hidden{display:none!important}.wrap{max-width:1180px;margin:auto;padding:16px}
+    .brand{background:var(--green);color:#fff;padding:18px;border-radius:16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .brand h1{font-size:21px;margin:0 0 5px}.brand p{margin:0;color:#d8f1e2;font-size:13px}
+    .logo{width:48px;height:48px;border-radius:12px;background:var(--yellow);color:var(--green);display:grid;place-items:center;font-weight:900;font-size:20px}
+    .card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:16px;margin-top:14px;box-shadow:0 2px 8px #183d2610}
+    .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.stat{background:#fff;border:1px solid var(--line);border-radius:12px;padding:15px}.stat b{font-size:25px;color:var(--green);display:block;margin-top:6px}
+    .tabs{display:flex;gap:7px;overflow:auto;margin:14px 0}.tabs button{white-space:nowrap;background:#e4eee7;color:var(--green)}.tabs button.active{background:var(--green);color:#fff}
+    .row{display:flex;gap:10px;align-items:end;flex-wrap:wrap}.field{flex:1;min-width:150px}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    #reader{max-width:520px;margin:10px auto;overflow:hidden;border-radius:12px}#reader video{border-radius:12px}
+    .result{padding:13px;border-radius:10px;margin-top:12px;background:#edf7ef;border:1px solid #b7dec2}.result.bad{background:#fff0ef;border-color:#f0b7b3}
+    table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{background:#edf4ef;color:#244d35}
+    .tablewrap{overflow:auto;max-height:430px}.pill{display:inline-block;border-radius:20px;padding:4px 8px;background:#e8f5e9;color:#176b43;font-size:11px;font-weight:700}.pill.late{background:#fff4d6;color:#805300}
+    .formgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:0 12px}.login{max-width:420px;margin:8vh auto}.login .card{padding:24px}
+    .qrgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px}.qr-card{background:#fff;border:1px dashed #9aaca0;border-radius:10px;padding:12px;text-align:center;break-inside:avoid}.qr-card .qrcode{display:flex;justify-content:center;margin:8px}
+    .notice{padding:10px;border-radius:9px;background:#fff8e4;color:#6b5100;font-size:13px}
+    @media(max-width:760px){.grid{grid-template-columns:repeat(2,1fr)}.formgrid{grid-template-columns:1fr}.wrap{padding:10px}.brand h1{font-size:18px}.card{padding:13px}}
+    @media print{body{background:#fff}.no-print{display:none!important}.qrgrid{grid-template-columns:repeat(3,1fr)}.qr-card{border:1px solid #aaa}.wrap{max-width:none;padding:0}}
+  </style>
+</head>
+<body>
+<div id="loginView" class="wrap login">
+  <div class="brand"><div><h1>ABSENSI DIGITAL</h1><p>MTs NW Talun · Tahun Pelajaran 2026/2027</p></div><div class="logo">NW</div></div>
+  <div class="card">
+    <h2>Login Pengguna</h2>
+    <p class="muted">Masuk menggunakan akun yang diberikan administrator.</p>
+    <label>Username</label><input id="loginUser" autocomplete="username" placeholder="Masukkan username">
+    <label>PIN</label><input id="loginPin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="Masukkan PIN">
+    <div class="actions"><button style="width:100%" onclick="doLogin()">Masuk ke Aplikasi</button></div>
+    <p id="loginMsg" class="muted"></p>
+    <div class="notice">Login awal setelah database disiapkan: <b>admin</b> / <b>123456</b>. Segera ganti PIN setelah masuk.</div>
+  </div>
+</div>
+
+<div id="appView" class="wrap hidden">
+  <header class="brand">
+    <div><h1>ABSENSI DIGITAL MTs NW TALUN</h1><p id="headerSub">Sistem kehadiran warga madrasah</p></div>
+    <div style="text-align:right"><div class="logo" style="margin-left:auto">NW</div><small id="who"></small></div>
+  </header>
+  <nav class="tabs no-print">
+    <button class="active" data-tab="dashboard" onclick="showTab('dashboard',this)">Dashboard</button>
+    <button data-tab="scan" onclick="showTab('scan',this)">Scan QR</button>
+    <button data-tab="people" onclick="showTab('people',this)">Data Warga</button>
+    <button data-tab="reports" onclick="showTab('reports',this)">Rekap & Excel</button>
+    <button data-tab="users" onclick="showTab('users',this)">Pengguna</button>
+    <button class="secondary" onclick="doLogout()">Keluar</button>
+  </nav>
+
+  <section id="tab-dashboard">
+    <div class="row"><div><h2>Dashboard Kehadiran</h2><div class="muted" id="todayLabel"></div></div><div class="field"></div><button class="secondary" onclick="loadDashboard()">Muat ulang</button></div>
+    <div class="grid" style="margin-top:12px">
+      <div class="stat">Siswa hadir scan<b id="dSiswa">0</b></div><div class="stat">Guru hadir scan<b id="dGuru">0</b></div>
+      <div class="stat">Tendik hadir scan<b id="dTendik">0</b></div><div class="stat">Terlambat<b id="dLate">0</b></div>
+    </div>
+    <div class="card"><h3>Scan Terbaru</h3><div class="tablewrap"><table><thead><tr><th>Jam</th><th>Nama</th><th>Kategori</th><th>Kelas/Jabatan</th><th>Status</th></tr></thead><tbody id="recentRows"></tbody></table></div></div>
+  </section>
+
+  <section id="tab-scan" class="hidden">
+    <div class="card">
+      <h2>Scan QR Code Kehadiran</h2><p class="muted">Izinkan akses kamera. Gunakan kamera belakang HP dan arahkan ke QR Code kartu.</p>
+      <div class="row no-print"><div class="field"><label>Nama perangkat/petugas (opsional)</label><input id="deviceName" placeholder="Contoh: HP Guru Piket 1"></div></div>
+      <div id="reader"></div>
+      <div class="actions no-print"><button onclick="startScanner()">Mulai Kamera</button><button class="secondary" onclick="stopScanner()">Hentikan Kamera</button></div>
+      <div id="scanResult"></div>
+    </div>
+  </section>
+
+  <section id="tab-people" class="hidden">
+    <div class="card">
+      <h2>Tambah Data Warga Madrasah</h2>
+      <div class="formgrid">
+        <div><label>Kategori</label><select id="pCategory" onchange="adjustPersonForm()"><option>Siswa</option><option>Guru</option><option>Tendik</option></select></div>
+        <div><label>ID unik</label><input id="pId" placeholder="Contoh: S0001"></div>
+        <div><label>NIS / NIP / ID Pegawai</label><input id="pNumber"></div>
+        <div><label>Nama lengkap</label><input id="pName"></div>
+        <div><label>Kelas / Jabatan</label><input id="pGroup" placeholder="Contoh: VII A"></div>
+        <div id="genderWrap"><label>Jenis kelamin</label><select id="pGender"><option value="">Pilih</option><option>L</option><option>P</option></select></div>
+      </div>
+      <div class="actions"><button onclick="addPerson()">Simpan dan Buat QR</button></div>
+      <div id="personMsg"></div>
+    </div>
+    <div class="card">
+      <h2>Impor Data Massal</h2>
+      <p class="muted">Tempel dari Excel dengan pemisah titik koma atau TAB. Urutan: Kategori;ID;Nomor;Nama;Kelas/Jabatan;JK. Kategori: Siswa, Guru, atau Tendik.</p>
+      <textarea id="bulkText" rows="5" placeholder="Siswa;S0001;2026001;Ahmad Fauzi;VII A;L&#10;Siswa;S0002;2026002;Siti Aminah;VII A;P&#10;Guru;G0001;1988001;Abdul Azis;Guru Informatika;"></textarea>
+      <div class="actions"><button onclick="importBulk()">Impor Data</button><button class="secondary" onclick="document.getElementById('bulkText').value=''">Bersihkan</button></div><div id="bulkMsg"></div>
+    </div>
+    <div class="card">
+      <div class="row"><div class="field"><h2>Daftar QR Code</h2></div><div class="field"><select id="peopleFilter" onchange="loadPeople()"><option value="">Semua kategori</option><option>Siswa</option><option>Guru</option><option>Tendik</option></select></div><button class="secondary" onclick="loadPeople()">Muat data</button><button class="yellow" onclick="printQr()">Cetak QR</button></div>
+      <div id="peopleTable" class="tablewrap"></div>
+      <div id="printQrArea" class="qrgrid hidden"></div>
+    </div>
+  </section>
+
+  <section id="tab-reports" class="hidden">
+    <div class="card">
+      <h2>Rekap Kehadiran dan Ekspor Excel</h2>
+      <div class="formgrid">
+        <div><label>Tanggal mulai</label><input id="fromDate" type="date"></div>
+        <div><label>Tanggal akhir</label><input id="toDate" type="date"></div>
+        <div><label>Kategori</label><select id="reportCategory"><option value="">Semua</option><option>Siswa</option><option>Guru</option><option>Tendik</option></select></div>
+      </div>
+      <div class="actions"><button onclick="loadReports()">Tampilkan Rekap</button><button class="yellow" onclick="downloadExcel()">Unduh Excel (.xlsx)</button></div>
+      <div id="reportSummary" class="muted" style="margin:12px 0"></div>
+      <div id="reportTable" class="tablewrap"></div>
+    </div>
+  </section>
+
+  <section id="tab-users" class="hidden">
+    <div class="card">
+      <h2>Pengaturan Akun</h2>
+      <p class="muted">Admin dapat membuat akun guru piket dan kepala madrasah. Bagikan username dan PIN secara pribadi.</p>
+      <div class="formgrid">
+        <div><label>Username baru</label><input id="uName" placeholder="contoh: piket1"></div>
+        <div><label>Nama petugas</label><input id="uFullName" placeholder="Nama lengkap"></div>
+        <div><label>PIN minimal 6 angka/karakter</label><input id="uPin" type="password"></div>
+        <div><label>Peran</label><select id="uRole"><option value="PIKET">Guru Piket</option><option value="KEPALA">Kepala Madrasah</option><option value="ADMIN">Admin</option></select></div>
+      </div>
+      <div class="actions"><button onclick="createUser()">Buat Akun</button></div><div id="userMsg"></div>
+    </div>
+    <div class="card">
+      <h2>Ganti PIN Saya</h2>
+      <div class="formgrid"><div><label>PIN lama</label><input id="oldPin" type="password"></div><div><label>PIN baru</label><input id="newPin" type="password"></div></div>
+      <div class="actions"><button onclick="changePin()">Simpan PIN Baru</button></div><div id="pinMsg"></div>
+    </div>
+  </section>
+  <footer class="muted" style="text-align:center;padding:20px">ABSENSI DIGITAL · MTs NW TALUN · 2026/2027</footer>
+</div>
+
+<script>
+let AUTH=null, USER=null, scanner=null, lastScan="", peopleCache=[];
+const $=id=>document.getElementById(id);
+const API_URL = "PASTE_URL_CLOUDFLARE_WORKER_DI_SINI";
+async function callServer(fn,...args){
+  if(!API_URL || API_URL.includes("PASTE_URL")) throw new Error("Alamat API belum diatur. Isi API_URL pada file index.html sesuai URL Cloudflare Worker.");
+  const response = await fetch(API_URL, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({fn:fn,args:args})});
+  if(!response.ok) throw new Error("Server API memberi respons HTTP " + response.status);
+  const payload = await response.json();
+  if(!payload.ok) throw new Error(payload.message || "Permintaan API gagal.");
+  return payload.data;
+}
+function msg(id,text,bad=false){$(id).innerHTML='<div class="result '+(bad?'bad':'')+'">'+escapeHtml(text)+'</div>'}
+function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+async function doLogin(){
+  $("loginMsg").textContent="Memeriksa akun...";
+  try{const r=await callServer("login",$("loginUser").value,$("loginPin").value);
+    if(!r.ok){$("loginMsg").textContent=r.message;return}
+    AUTH=r.token;USER=r.user;$("loginView").classList.add("hidden");$("appView").classList.remove("hidden");
+    $("who").textContent=USER.name+" · "+USER.role;
+    if(USER.role!=="ADMIN"){document.querySelector('[data-tab="people"]').classList.add("hidden");document.querySelector('[data-tab="users"]').classList.add("hidden")}
+    if(USER.role==="PIKET"){document.querySelector('[data-tab="reports"]').classList.add("hidden")}
+    const info=await callServer("getAppInfo",AUTH);$("headerSub").textContent=(info.config.NAMA_MADRASAH||"MTs NW Talun")+" · "+(info.config.TAHUN_PELAJARAN||"");
+    loadDashboard();
+  }catch(e){$("loginMsg").textContent=e.message}
+}
+async function doLogout(){try{await stopScanner();await callServer("logout",AUTH)}catch(e){}AUTH=null;USER=null;$("appView").classList.add("hidden");$("loginView").classList.remove("hidden");$("loginPin").value=""}
+function showTab(tab,btn){document.querySelectorAll("#appView section").forEach(s=>s.classList.add("hidden"));$("tab-"+tab).classList.remove("hidden");document.querySelectorAll(".tabs button[data-tab]").forEach(b=>b.classList.remove("active"));if(btn)btn.classList.add("active");if(tab==="dashboard")loadDashboard();if(tab==="people")loadPeople();if(tab==="reports")loadReports()}
+async function loadDashboard(){
+  try{const d=await callServer("getDashboard",AUTH);$("todayLabel").textContent="Tanggal: "+d.date+" · Total scan: "+d.total;$("dSiswa").textContent=d.siswa;$("dGuru").textContent=d.guru;$("dTendik").textContent=d.tendik;$("dLate").textContent=d.terlambat;
+    $("recentRows").innerHTML=d.recent.map(r=>`<tr><td>${escapeHtml(r.time)}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.category)}</td><td>${escapeHtml(r.group)}</td><td>${escapeHtml(r.status)}</td></tr>`).join("")||'<tr><td colspan="5">Belum ada scan hari ini.</td></tr>';
+  }catch(e){alert(e.message)}
+}
+async function startScanner(){
+  if(!window.Html5Qrcode){msg("scanResult","Pustaka pemindai belum termuat. Periksa koneksi internet.",true);return}
+  try{
+    if(scanner){await stopScanner()}
+    scanner=new Html5Qrcode("reader");
+    await scanner.start({facingMode:"environment"},{fps:10,qrbox:{width:240,height:240}},async decoded=>{if(decoded===lastScan)return;lastScan=decoded;await processScan(decoded);setTimeout(()=>lastScan="",2500)},()=>{});
+  }catch(e){msg("scanResult","Kamera tidak dapat dibuka. Izinkan akses kamera dan gunakan alamat HTTPS.",true)}
+}
+async function stopScanner(){if(scanner){try{if(scanner.isScanning)await scanner.stop();scanner.clear()}catch(e){}scanner=null}}
+async function processScan(qr){
+  try{const r=await callServer("scanQr",AUTH,qr,$("deviceName").value||"HP Guru Piket");
+    if(r.ok){msg("scanResult",r.person.name+" · "+r.person.category+" · "+r.time+" · "+r.status);loadDashboard();beep(true)}
+    else{msg("scanResult",r.message,true);beep(false)}
+  }catch(e){msg("scanResult",e.message,true)}
+}
+function beep(ok){try{const C=window.AudioContext||window.webkitAudioContext,c=new C(),o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=ok?880:220;g.gain.value=.06;o.start();o.stop(c.currentTime+.13)}catch(e){}}
+function adjustPersonForm(){$("genderWrap").style.display=$("pCategory").value==="Siswa"?"block":"none";$("pId").placeholder=$("pCategory").value==="Siswa"?"S0001":$("pCategory").value==="Guru"?"G0001":"T0001";$("pGroup").placeholder=$("pCategory").value==="Siswa"?"VII A":"Jabatan"}
+async function addPerson(){
+  try{const d={category:$("pCategory").value,id:$("pId").value,number:$("pNumber").value,name:$("pName").value,group:$("pGroup").value,gender:$("pGender").value};
+    const r=await callServer("addPerson",AUTH,d);msg("personMsg","Data "+r.name+" berhasil disimpan. QR Code dibuat dengan token unik.");loadPeople();
+    ["pId","pNumber","pName","pGroup"].forEach(x=>$(x).value="");
+  }catch(e){msg("personMsg",e.message,true)}
+}
+async function importBulk(){try{const r=await callServer("importPeople",AUTH,$("bulkText").value);msg("bulkMsg","Berhasil mengimpor "+r.count+" data. QR Code unik dibuat untuk setiap orang.");$("bulkText").value="";loadPeople()}catch(e){msg("bulkMsg",e.message,true)}}
+async function loadPeople(){
+  try{peopleCache=await callServer("listPeople",AUTH,$("peopleFilter").value);
+    $("peopleTable").innerHTML='<table><thead><tr><th>ID</th><th>Nama</th><th>Kategori</th><th>Kelas/Jabatan</th><th>Status</th></tr></thead><tbody>'+
+      peopleCache.map(p=>`<tr><td>${escapeHtml(p.id)}</td><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.category)}</td><td>${escapeHtml(p.group)}</td><td>${escapeHtml(p.active)}</td></tr>`).join("")+'</tbody></table>';
+  }catch(e){$("peopleTable").textContent=e.message}
+}
+function printQr(){
+  if(!peopleCache.length){alert("Muat data warga terlebih dahulu.");return}
+  const area=$("printQrArea");area.innerHTML="";area.classList.remove("hidden");
+  peopleCache.forEach(p=>{
+    const card=document.createElement("div");card.className="qr-card";
+    card.innerHTML=`<b>MTs NW TALUN</b><div>${escapeHtml(p.name)}</div><small>${escapeHtml(p.id)} · ${escapeHtml(p.group)}</small><div class="qrcode"></div><small>${escapeHtml(p.category)}</small>`;
+    area.appendChild(card);new QRCode(card.querySelector(".qrcode"),{text:p.qr,width:112,height:112});
+  });
+  setTimeout(()=>window.print(),500);
+}
+async function loadReports(){
+  try{const from=$("fromDate").value,to=$("toDate").value,cat=$("reportCategory").value;const rows=await callServer("getAttendance",AUTH,from,to,cat);
+    $("reportSummary").textContent="Menampilkan "+rows.length+" catatan terbaru (maksimal 3.000 catatan).";
+    $("reportTable").innerHTML='<table><thead><tr><th>Tanggal</th><th>Jam</th><th>ID</th><th>Nama</th><th>Kategori</th><th>Kelas/Jabatan</th><th>Status</th><th>Petugas</th></tr></thead><tbody>'+
+      rows.map(r=>`<tr><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.time)}</td><td>${escapeHtml(r.id)}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.category)}</td><td>${escapeHtml(r.group)}</td><td>${escapeHtml(r.status)}</td><td>${escapeHtml(r.officer)}</td></tr>`).join("")+'</tbody></table>';
+  }catch(e){$("reportTable").textContent=e.message}
+}
+async function downloadExcel(){
+  try{const r=await callServer("exportExcel",AUTH,$("fromDate").value,$("toDate").value,$("reportCategory").value);
+    const bytes=Uint8Array.from(atob(r.data),c=>c.charCodeAt(0));const blob=new Blob([bytes],{type:r.mimeType});const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");a.href=url;a.download=r.filename;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+    $("reportSummary").textContent="File Excel dibuat. Jumlah catatan: "+r.count;
+  }catch(e){alert("Ekspor gagal: "+e.message)}
+}
+async function createUser(){try{await callServer("createUser",AUTH,{username:$("uName").value,name:$("uFullName").value,pin:$("uPin").value,role:$("uRole").value});msg("userMsg","Akun berhasil dibuat.");["uName","uFullName","uPin"].forEach(x=>$(x).value="")}catch(e){msg("userMsg",e.message,true)}}
+async function changePin(){try{await callServer("changePin",AUTH,$("oldPin").value,$("newPin").value);msg("pinMsg","PIN berhasil diubah.");$("oldPin").value="";$("newPin").value=""}catch(e){msg("pinMsg",e.message,true)}}
+(function initDates(){const d=new Date(),s=d.toISOString().slice(0,10);$("fromDate").value=s.slice(0,8)+"01";$("toDate").value=s})();
+</script>
+</body>
+</html>
