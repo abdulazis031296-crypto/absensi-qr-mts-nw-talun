@@ -162,7 +162,7 @@ async function callServer(fn, ...args) {
     headers: {
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ fn, ...args })
+    body: JSON.stringify({ fn, args })
   });
 
   if (!response.ok) {
