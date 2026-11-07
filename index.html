@@ -262,20 +262,43 @@ async function loadPeople(){
       peopleCache.map(p=>`<tr><td>${escapeHtml(p.id)}</td><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.category)}</td><td>${escapeHtml(p.group)}</td><td>${escapeHtml(p.active)}</td></tr>`).join('')+'</tbody></table>';
   }catch(e){$('peopleTable').textContent=e.message}
 }
-function printQr(){
-  if(!peopleCache.length){alert('Muat data warga terlebih dahulu.');return}
-  const area=$('printQrArea');area.innerHTML='';area.classList.remove('hidden');
-  peopleCache.forEach(p=>{
-    const card=document.createElement('div');card.className='qr-card';
-    card.innerHTML=`<b>MTs NW TALUN</b><div>${escapeHtml(p.name)}</div><small>${escapeHtml(p.id)} · ${escapeHtml(p.group)}</small><div class="qrcode"></div><small>${escapeHtml(p.category)}</small>`;
+
+function printQr() {
+  if (!peopleCache.length) {
+    alert('Muat data warga terlebih dahulu.');
+    return;
+  }
+
+  const area = $('printQrArea');
+  area.innerHTML = '';
+  area.classList.remove('hidden');
+
+  peopleCache.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'qr-card';
+
+    card.innerHTML =
+      '<b>MTs NW TALUN</b><div>' +
+      escapeHtml(p.name) +
+      '</div><small>' +
+      escapeHtml(p.id) +
+      ' · ' +
+      escapeHtml(p.group) +
+      '</small><div class="qrcode"></div><small>' +
+      escapeHtml(p.category) +
+      '</small>';
+
     area.appendChild(card);
-new QRCode(card.querySelector(".qrcode"), {
-  text: p.token,
-  width: 112,
-  height: 112,
-  correctLevel: QRCode.CorrectLevel.H
-});
-  setTimeout(()=>window.print(),500);
+
+    new QRCode(card.querySelector('.qrcode'), {
+      text: p.token,
+      width: 112,
+      height: 112,
+      correctLevel: QRCode.CorrectLevel.H
+    });
+  });
+
+  setTimeout(() => window.print(), 500);
 }
 async function loadReports(){
   try{
