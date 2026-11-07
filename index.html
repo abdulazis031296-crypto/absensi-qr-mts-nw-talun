@@ -43,7 +43,7 @@
     <label>PIN</label><input id="loginPin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="Masukkan PIN">
     <div class="actions"><button style="width:100%" onclick="doLogin()">Masuk ke Aplikasi</button></div>
     <p id="loginMsg" class="muted"></p>
-    <div class="notice">Login awal setelah database disiapkan: <b>admin</b> / <b>123456</b>. Segera ganti PIN setelah masuk.</div>
+    <div class="notice">Akun administrator pertama dibuat melalui fungsi <b>buatAdminPertama()</b> di Apps Script. Tidak ada PIN bawaan.</div>
   </div>
 </div>
 
@@ -74,6 +74,15 @@
     <div class="card">
       <h2>Scan QR Code Kehadiran</h2><p class="muted">Izinkan akses kamera. Gunakan kamera belakang HP dan arahkan ke QR Code kartu.</p>
       <div class="row no-print"><div class="field"><label>Nama perangkat/petugas (opsional)</label><input id="deviceName" placeholder="Contoh: HP Guru Piket 1"></div></div>
+      <div class="row no-print">
+        <div class="field">
+          <label>Jenis absensi (pilih sebelum scan)</label>
+          <select id="scanMode">
+            <option value="MASUK">MASUK</option>
+            <option value="PULANG">PULANG</option>
+          </select>
+        </div>
+      </div>
       <div id="reader"></div>
       <div class="actions no-print"><button onclick="startScanner()">Mulai Kamera</button><button class="secondary" onclick="stopScanner()">Hentikan Kamera</button></div>
       <div id="scanResult"></div>
@@ -115,7 +124,7 @@
         <div><label>Tanggal akhir</label><input id="toDate" type="date"></div>
         <div><label>Kategori</label><select id="reportCategory"><option value="">Semua</option><option>Siswa</option><option>Guru</option><option>Tendik</option></select></div>
       </div>
-      <div class="actions"><button onclick="loadReports()">Tampilkan Rekap</button><button class="yellow" onclick="downloadExcel()">Unduh Excel (.xlsx)</button></div>
+      <div class="actions"><button onclick="loadReports()">Tampilkan Rekap</button><button class="yellow" onclick="downloadExcel()">Unduh CSV (bisa dibuka di Excel)</button></div>
       <div id="reportSummary" class="muted" style="margin:12px 0"></div>
       <div id="reportTable" class="tablewrap"></div>
     </div>
@@ -145,93 +154,135 @@
 <script>
 let AUTH=null, USER=null, scanner=null, lastScan="", peopleCache=[];
 const $=id=>document.getElementById(id);
-const API_URL = 'https://absensi-qr-mts-nw-talun.abdulazis031296.workers.dev';
+const API_URL='https://absensi-qr-mts-nw-talun.abdulazis031296.workers.dev';
+
 async function callServer(fn,...args){
-  if(!API_URL || API_URL.includes("PASTE_URL")) throw new Error("Alamat API belum diatur. Isi API_URL pada file index.html sesuai URL Cloudflare Worker.");
-  const response = await fetch(API_URL, {method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({fn:fn,args:args})});
-  if(!response.ok) throw new Error("Server API memberi respons HTTP " + response.status);
-  const payload = await response.json();
-  if(!payload.ok) throw new Error(payload.message || "Permintaan API gagal.");
+  const response=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fn,args})});
+  if(!response.ok) throw new Error('Server API memberi respons HTTP '+response.status);
+  const payload=await response.json();
+  if(!payload.ok) throw new Error(payload.message||'Permintaan API gagal.');
   return payload.data;
 }
 function msg(id,text,bad=false){$(id).innerHTML='<div class="result '+(bad?'bad':'')+'">'+escapeHtml(text)+'</div>'}
-function escapeHtml(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+
 async function doLogin(){
-  $("loginMsg").textContent="Memeriksa akun...";
-  try{const r=await callServer("login",$("loginUser").value,$("loginPin").value);
-    if(!r.ok){$("loginMsg").textContent=r.message;return}
-    AUTH=r.token;USER=r.user;$("loginView").classList.add("hidden");$("appView").classList.remove("hidden");
-    $("who").textContent=USER.name+" · "+USER.role;
-    if(USER.role!=="ADMIN"){document.querySelector('[data-tab="people"]').classList.add("hidden");document.querySelector('[data-tab="users"]').classList.add("hidden")}
-    if(USER.role==="PIKET"){document.querySelector('[data-tab="reports"]').classList.add("hidden")}
-    const info=await callServer("getAppInfo",AUTH);$("headerSub").textContent=(info.config.NAMA_MADRASAH||"MTs NW Talun")+" · "+(info.config.TAHUN_PELAJARAN||"");
+  $('loginMsg').textContent='Memeriksa akun...';
+  const credentials={username:$('loginUser').value.trim(),pin:$('loginPin').value};
+  try{
+    const r=await callServer('login',credentials);
+    AUTH=credentials;USER=r.user;
+    $('loginView').classList.add('hidden');$('appView').classList.remove('hidden');
+    $('who').textContent=USER.name+' · '+USER.role.toUpperCase();
+    if(USER.role!=='admin'){
+      document.querySelector('[data-tab="people"]').classList.add('hidden');
+      document.querySelector('[data-tab="users"]').classList.add('hidden');
+    }
+    if(USER.role==='piket') document.querySelector('[data-tab="reports"]').classList.add('hidden');
+    const info=await callServer('getAppInfo',AUTH);
+    $('headerSub').textContent=(info.NAMA_MADRASAH||'MTs NW Talun')+' · '+(info.TAHUN_PELAJARAN||'2026/2027');
     loadDashboard();
-  }catch(e){$("loginMsg").textContent=e.message}
+  }catch(e){$('loginMsg').textContent=e.message}
 }
-async function doLogout(){try{await stopScanner();await callServer("logout",AUTH)}catch(e){}AUTH=null;USER=null;$("appView").classList.add("hidden");$("loginView").classList.remove("hidden");$("loginPin").value=""}
-function showTab(tab,btn){document.querySelectorAll("#appView section").forEach(s=>s.classList.add("hidden"));$("tab-"+tab).classList.remove("hidden");document.querySelectorAll(".tabs button[data-tab]").forEach(b=>b.classList.remove("active"));if(btn)btn.classList.add("active");if(tab==="dashboard")loadDashboard();if(tab==="people")loadPeople();if(tab==="reports")loadReports()}
+async function doLogout(){
+  try{await stopScanner()}catch(e){}
+  AUTH=null;USER=null;$('appView').classList.add('hidden');$('loginView').classList.remove('hidden');$('loginPin').value='';
+}
+function showTab(tab,btn){
+  document.querySelectorAll('#appView section').forEach(s=>s.classList.add('hidden'));
+  $('tab-'+tab).classList.remove('hidden');
+  document.querySelectorAll('.tabs button[data-tab]').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  if(tab==='dashboard')loadDashboard();
+  if(tab==='people')loadPeople();
+  if(tab==='reports')loadReports();
+}
 async function loadDashboard(){
-  try{const d=await callServer("getDashboard",AUTH);$("todayLabel").textContent="Tanggal: "+d.date+" · Total scan: "+d.total;$("dSiswa").textContent=d.siswa;$("dGuru").textContent=d.guru;$("dTendik").textContent=d.tendik;$("dLate").textContent=d.terlambat;
-    $("recentRows").innerHTML=d.recent.map(r=>`<tr><td>${escapeHtml(r.time)}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.category)}</td><td>${escapeHtml(r.group)}</td><td>${escapeHtml(r.status)}</td></tr>`).join("")||'<tr><td colspan="5">Belum ada scan hari ini.</td></tr>';
+  try{
+    const d=await callServer('getDashboard',AUTH);
+    $('todayLabel').textContent='Tanggal: '+d.date+' · Total scan: '+d.total;
+    $('dSiswa').textContent=d.siswa;$('dGuru').textContent=d.guru;$('dTendik').textContent=d.tendik;$('dLate').textContent=d.terlambat;
+    $('recentRows').innerHTML=d.recent.map(r=>`<tr><td>${escapeHtml(r.time)}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.category)}</td><td>${escapeHtml(r.group)}</td><td>${escapeHtml(r.status)}</td></tr>`).join('')||'<tr><td colspan="5">Belum ada scan hari ini.</td></tr>';
   }catch(e){alert(e.message)}
 }
 async function startScanner(){
-  if(!window.Html5Qrcode){msg("scanResult","Pustaka pemindai belum termuat. Periksa koneksi internet.",true);return}
+  if(!window.Html5Qrcode){msg('scanResult','Pustaka pemindai belum termuat. Periksa koneksi internet.',true);return}
   try{
-    if(scanner){await stopScanner()}
-    scanner=new Html5Qrcode("reader");
-    await scanner.start({facingMode:"environment"},{fps:10,qrbox:{width:240,height:240}},async decoded=>{if(decoded===lastScan)return;lastScan=decoded;await processScan(decoded);setTimeout(()=>lastScan="",2500)},()=>{});
-  }catch(e){msg("scanResult","Kamera tidak dapat dibuka. Izinkan akses kamera dan gunakan alamat HTTPS.",true)}
+    if(scanner)await stopScanner();
+    scanner=new Html5Qrcode('reader');
+    await scanner.start({facingMode:'environment'},{fps:10,qrbox:{width:240,height:240}},async decoded=>{
+      if(decoded===lastScan)return;lastScan=decoded;await processScan(decoded);setTimeout(()=>lastScan='',2500);
+    },()=>{});
+  }catch(e){msg('scanResult','Kamera tidak dapat dibuka. Izinkan akses kamera dan gunakan alamat HTTPS.',true)}
 }
 async function stopScanner(){if(scanner){try{if(scanner.isScanning)await scanner.stop();scanner.clear()}catch(e){}scanner=null}}
 async function processScan(qr){
-  try{const r=await callServer("scanQr",AUTH,qr,$("deviceName").value||"HP Guru Piket");
-    if(r.ok){msg("scanResult",r.person.name+" · "+r.person.category+" · "+r.time+" · "+r.status);loadDashboard();beep(true)}
-    else{msg("scanResult",r.message,true);beep(false)}
-  }catch(e){msg("scanResult",e.message,true)}
+  const mode=$('scanMode').value;
+  try{
+    const r=await callServer('scanQr',AUTH,qr,$('deviceName').value||'HP Guru Piket',mode);
+    msg('scanResult',r.message+(r.status?' · '+r.status:''),false);
+    loadDashboard();beep(true);
+  }catch(e){msg('scanResult',e.message,true);beep(false)}
 }
 function beep(ok){try{const C=window.AudioContext||window.webkitAudioContext,c=new C(),o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=ok?880:220;g.gain.value=.06;o.start();o.stop(c.currentTime+.13)}catch(e){}}
-function adjustPersonForm(){$("genderWrap").style.display=$("pCategory").value==="Siswa"?"block":"none";$("pId").placeholder=$("pCategory").value==="Siswa"?"S0001":$("pCategory").value==="Guru"?"G0001":"T0001";$("pGroup").placeholder=$("pCategory").value==="Siswa"?"VII A":"Jabatan"}
-async function addPerson(){
-  try{const d={category:$("pCategory").value,id:$("pId").value,number:$("pNumber").value,name:$("pName").value,group:$("pGroup").value,gender:$("pGender").value};
-    const r=await callServer("addPerson",AUTH,d);msg("personMsg","Data "+r.name+" berhasil disimpan. QR Code dibuat dengan token unik.");loadPeople();
-    ["pId","pNumber","pName","pGroup"].forEach(x=>$(x).value="");
-  }catch(e){msg("personMsg",e.message,true)}
+function adjustPersonForm(){
+  $('genderWrap').style.display=$('pCategory').value==='Siswa'?'block':'none';
+  $('pId').placeholder=$('pCategory').value==='Siswa'?'S0001':$('pCategory').value==='Guru'?'G0001':'T0001';
+  $('pGroup').placeholder=$('pCategory').value==='Siswa'?'VII A':'Jabatan';
 }
-async function importBulk(){try{const r=await callServer("importPeople",AUTH,$("bulkText").value);msg("bulkMsg","Berhasil mengimpor "+r.count+" data. QR Code unik dibuat untuk setiap orang.");$("bulkText").value="";loadPeople()}catch(e){msg("bulkMsg",e.message,true)}}
+async function addPerson(){
+  try{
+    const d={category:$('pCategory').value,id:$('pId').value,number:$('pNumber').value,name:$('pName').value,group:$('pGroup').value,gender:$('pGender').value};
+    const r=await callServer('addPerson',AUTH,d);msg('personMsg','Data '+r.name+' berhasil disimpan. QR Code telah dibuat.');loadPeople();
+    ['pId','pNumber','pName','pGroup'].forEach(x=>$(x).value='');
+  }catch(e){msg('personMsg',e.message,true)}
+}
+async function importBulk(){
+  try{const r=await callServer('importPeople',AUTH,$('bulkText').value);msg('bulkMsg','Berhasil mengimpor '+r.count+' data. QR Code unik dibuat.');$('bulkText').value='';loadPeople()}
+  catch(e){msg('bulkMsg',e.message,true)}
+}
 async function loadPeople(){
-  try{peopleCache=await callServer("listPeople",AUTH,$("peopleFilter").value);
-    $("peopleTable").innerHTML='<table><thead><tr><th>ID</th><th>Nama</th><th>Kategori</th><th>Kelas/Jabatan</th><th>Status</th></tr></thead><tbody>'+
-      peopleCache.map(p=>`<tr><td>${escapeHtml(p.id)}</td><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.category)}</td><td>${escapeHtml(p.group)}</td><td>${escapeHtml(p.active)}</td></tr>`).join("")+'</tbody></table>';
-  }catch(e){$("peopleTable").textContent=e.message}
+  try{
+    peopleCache=await callServer('listPeople',AUTH,$('peopleFilter').value);
+    $('peopleTable').innerHTML='<table><thead><tr><th>ID</th><th>Nama</th><th>Kategori</th><th>Kelas/Jabatan</th><th>Status</th></tr></thead><tbody>'+
+      peopleCache.map(p=>`<tr><td>${escapeHtml(p.id)}</td><td>${escapeHtml(p.name)}</td><td>${escapeHtml(p.category)}</td><td>${escapeHtml(p.group)}</td><td>${escapeHtml(p.active)}</td></tr>`).join('')+'</tbody></table>';
+  }catch(e){$('peopleTable').textContent=e.message}
 }
 function printQr(){
-  if(!peopleCache.length){alert("Muat data warga terlebih dahulu.");return}
-  const area=$("printQrArea");area.innerHTML="";area.classList.remove("hidden");
+  if(!peopleCache.length){alert('Muat data warga terlebih dahulu.');return}
+  const area=$('printQrArea');area.innerHTML='';area.classList.remove('hidden');
   peopleCache.forEach(p=>{
-    const card=document.createElement("div");card.className="qr-card";
+    const card=document.createElement('div');card.className='qr-card';
     card.innerHTML=`<b>MTs NW TALUN</b><div>${escapeHtml(p.name)}</div><small>${escapeHtml(p.id)} · ${escapeHtml(p.group)}</small><div class="qrcode"></div><small>${escapeHtml(p.category)}</small>`;
-    area.appendChild(card);new QRCode(card.querySelector(".qrcode"),{text:p.qr,width:112,height:112});
+    area.appendChild(card);new QRCode(card.querySelector('.qrcode'),{text:p.qr,width:112,height:112});
   });
   setTimeout(()=>window.print(),500);
 }
 async function loadReports(){
-  try{const from=$("fromDate").value,to=$("toDate").value,cat=$("reportCategory").value;const rows=await callServer("getAttendance",AUTH,from,to,cat);
-    $("reportSummary").textContent="Menampilkan "+rows.length+" catatan terbaru (maksimal 3.000 catatan).";
-    $("reportTable").innerHTML='<table><thead><tr><th>Tanggal</th><th>Jam</th><th>ID</th><th>Nama</th><th>Kategori</th><th>Kelas/Jabatan</th><th>Status</th><th>Petugas</th></tr></thead><tbody>'+
-      rows.map(r=>`<tr><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.time)}</td><td>${escapeHtml(r.id)}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.category)}</td><td>${escapeHtml(r.group)}</td><td>${escapeHtml(r.status)}</td><td>${escapeHtml(r.officer)}</td></tr>`).join("")+'</tbody></table>';
-  }catch(e){$("reportTable").textContent=e.message}
+  try{
+    const rows=await callServer('getAttendance',AUTH,$('fromDate').value,$('toDate').value,$('reportCategory').value);
+    $('reportSummary').textContent='Menampilkan '+rows.length+' catatan.';
+    $('reportTable').innerHTML='<table><thead><tr><th>Tanggal</th><th>Jam Masuk</th><th>ID</th><th>Nama</th><th>Kategori</th><th>Kelas/Jabatan</th><th>Status</th><th>Jam Pulang</th></tr></thead><tbody>'+
+      rows.map(r=>`<tr><td>${escapeHtml(r.date)}</td><td>${escapeHtml(r.in)}</td><td>${escapeHtml(r.id)}</td><td>${escapeHtml(r.name)}</td><td>${escapeHtml(r.category)}</td><td>${escapeHtml(r.group)}</td><td>${escapeHtml(r.status)}</td><td>${escapeHtml(r.out)}</td></tr>`).join('')+'</tbody></table>';
+  }catch(e){$('reportTable').textContent=e.message}
 }
 async function downloadExcel(){
-  try{const r=await callServer("exportExcel",AUTH,$("fromDate").value,$("toDate").value,$("reportCategory").value);
-    const bytes=Uint8Array.from(atob(r.data),c=>c.charCodeAt(0));const blob=new Blob([bytes],{type:r.mimeType});const url=URL.createObjectURL(blob);
-    const a=document.createElement("a");a.href=url;a.download=r.filename;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
-    $("reportSummary").textContent="File Excel dibuat. Jumlah catatan: "+r.count;
-  }catch(e){alert("Ekspor gagal: "+e.message)}
+  try{
+    const r=await callServer('exportExcel',AUTH,$('fromDate').value,$('toDate').value,$('reportCategory').value);
+    const bytes=Uint8Array.from(atob(r.data),c=>c.charCodeAt(0));const blob=new Blob([bytes],{type:'text/csv;charset=utf-8;'});
+    const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=r.filename;document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+    $('reportSummary').textContent='File rekap CSV berhasil dibuat. Jumlah catatan: '+r.count;
+  }catch(e){alert('Ekspor gagal: '+e.message)}
 }
-async function createUser(){try{await callServer("createUser",AUTH,{username:$("uName").value,name:$("uFullName").value,pin:$("uPin").value,role:$("uRole").value});msg("userMsg","Akun berhasil dibuat.");["uName","uFullName","uPin"].forEach(x=>$(x).value="")}catch(e){msg("userMsg",e.message,true)}}
-async function changePin(){try{await callServer("changePin",AUTH,$("oldPin").value,$("newPin").value);msg("pinMsg","PIN berhasil diubah.");$("oldPin").value="";$("newPin").value=""}catch(e){msg("pinMsg",e.message,true)}}
-(function initDates(){const d=new Date(),s=d.toISOString().slice(0,10);$("fromDate").value=s.slice(0,8)+"01";$("toDate").value=s})();
+async function createUser(){
+  try{await callServer('createUser',AUTH,{username:$('uName').value,name:$('uFullName').value,pin:$('uPin').value,role:$('uRole').value});msg('userMsg','Akun berhasil dibuat.');['uName','uFullName','uPin'].forEach(x=>$(x).value='')}
+  catch(e){msg('userMsg',e.message,true)}
+}
+async function changePin(){
+  try{await callServer('changePin',AUTH,$('oldPin').value,$('newPin').value);msg('pinMsg','PIN berhasil diubah. Silakan login kembali dengan PIN baru.');$('oldPin').value='';$('newPin').value='';}
+  catch(e){msg('pinMsg',e.message,true)}
+}
+(function initDates(){const d=new Date(),s=d.toISOString().slice(0,10);$('fromDate').value=s.slice(0,8)+'01';$('toDate').value=s;adjustPersonForm()})();
 </script>
 </body>
 </html>
