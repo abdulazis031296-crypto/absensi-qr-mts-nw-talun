@@ -154,7 +154,7 @@
 <script>
 let AUTH=null, USER=null, scanner=null, lastScan="", peopleCache=[];
 const $=id=>document.getElementById(id);
-const API_URL = 'https://absensi-api-mts-nw-talun.NAMA-AKUN.workers.dev';
+https://absensi-api-mts-nw-talun-backend.abdulazis031296.workers.dev
 
 async function callServer(fn,...args){
   const response=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fn,args})});
