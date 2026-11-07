@@ -167,11 +167,6 @@ async function callServer(fn,...args){
   if(!payload.ok) throw new Error(payload.message||'Permintaan API gagal.');
   return payload.data;
 }
-  if(!response.ok) throw new Error('Server API memberi respons HTTP '+response.status);
-  const payload=await response.json();
-  if(!payload.ok) throw new Error(payload.message||'Permintaan API gagal.');
-  return payload.data;
-}
 function msg(id,text,bad=false){$(id).innerHTML='<div class="result '+(bad?'bad':'')+'">'+escapeHtml(text)+'</div>'}
 function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 
