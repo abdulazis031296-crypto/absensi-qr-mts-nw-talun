@@ -156,15 +156,25 @@ let AUTH=null, USER=null, scanner=null, lastScan="", peopleCache=[];
 const $=id=>document.getElementById(id);
 const API_URL = "https://absensi-api-mts-nw-talun-backend.abdulazis031296.workers.dev";
 
-async function callServer(fn,...args){
-  const response=await fetch(API_URL,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({fn,args})
+async function callServer(fn, ...args) {
+  const response = await fetch(API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({ fn, ...args })
   });
-  if(!response.ok) throw new Error('Server API memberi respons HTTP '+response.status);
-  const payload=await response.json();
-  if(!payload.ok) throw new Error(payload.message||'Permintaan API gagal.');
+
+  if (!response.ok) {
+    throw new Error('Server API memberi respons HTTP ' + response.status);
+  }
+
+  const payload = await response.json();
+
+  if (!payload.ok) {
+    throw new Error(payload.message || 'Permintaan API gagal.');
+  }
+
   return payload.data;
 }
 function msg(id,text,bad=false){$(id).innerHTML='<div class="result '+(bad?'bad':'')+'">'+escapeHtml(text)+'</div>'}
