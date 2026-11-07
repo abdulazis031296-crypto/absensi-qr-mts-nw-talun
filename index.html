@@ -258,8 +258,13 @@ function printQr(){
   peopleCache.forEach(p=>{
     const card=document.createElement('div');card.className='qr-card';
     card.innerHTML=`<b>MTs NW TALUN</b><div>${escapeHtml(p.name)}</div><small>${escapeHtml(p.id)} · ${escapeHtml(p.group)}</small><div class="qrcode"></div><small>${escapeHtml(p.category)}</small>`;
-    area.appendChild(card);new QRCode(card.querySelector('.qrcode'),{text:p.qr,width:112,height:112});
-  });
+    area.appendChild(card);
+new QRCode(card.querySelector(".qrcode"), {
+  text: p.token,
+  width: 112,
+  height: 112,
+  correctLevel: QRCode.CorrectLevel.H
+});
   setTimeout(()=>window.print(),500);
 }
 async function loadReports(){
